@@ -31,7 +31,7 @@ class VQADataProvider:
     @staticmethod
     def load_vqa_json(data_split):
         """
-        Parses the question and answer json files for the given data split. 
+        Parses the question and answer json files for the given data split.
         Returns the question dictionary and the answer dictionary.
         """
         qdic, adic = {}, {}
@@ -145,7 +145,7 @@ class VQADataProvider:
                 raise Exception("This should not happen.")
         else:
             return random.choice(prob_answer_list)
- 
+
     def qlist_to_vec(self, max_length, q_list):
         """
         Converts a list of words into a format suitable for the embedding layer.
@@ -178,7 +178,7 @@ class VQADataProvider:
                 cvec[i] = 0 if i == max_length - len(q_list) else 1
 
         return qvec, cvec, glove_matrix
- 
+
     def answer_to_vec(self, ans_str):
         """ Return answer id if the answer is included in vocabulary otherwise '' """
         if self.mode =='test-dev' or self.mode == 'test':
@@ -189,7 +189,7 @@ class VQADataProvider:
         else:
             ans = self.adict['']
         return ans
- 
+
     def vec_to_answer(self, ans_symbol):
         """ Return answer id if the answer is included in vocabulary otherwise '' """
         if self.rev_adict is None:
@@ -199,7 +199,7 @@ class VQADataProvider:
             self.rev_adict = rev_adict
 
         return self.rev_adict[ans_symbol]
- 
+
     def create_batch(self,qid_list):
 
         qvec = (np.zeros(self.batchsize*self.max_length)).reshape(self.batchsize,self.max_length)
@@ -208,7 +208,10 @@ class VQADataProvider:
         avec = (np.zeros(self.batchsize)).reshape(self.batchsize)
         glove_matrix = np.zeros(self.batchsize * self.max_length * GLOVE_EMBEDDING_SIZE).reshape(\
             self.batchsize, self.max_length, GLOVE_EMBEDDING_SIZE)
-
+        dcvec=(np.zeros(self.batchsize*config.NUM_DC*self.max_length)).reshape(self.batchsize*config.NUM_DC,self.max_length)
+        dc_glove_matrix = np.zeros(self.batchsize * config.NUM_DC * self.max_length * GLOVE_EMBEDDING_SIZE).reshape(\
+            self.batchsize*config.NUM_DC, self.max_length, GLOVE_EMBEDDING_SIZE)
+        dc_cvec=(np.zeros(self.batchsize*config.NUM_DC*self.max_length)).reshape(self.batchsize*config.NUM_DC,self.max_length)
         for i,qid in enumerate(qid_list):
 
             # load raw question information
@@ -227,11 +230,14 @@ class VQADataProvider:
                     t_ivec = np.load(config.DATA_PATHS['genome']['features_prefix'] + str(q_iid) + '.jpg.npz')['x']
                 else:
                     t_ivec = np.load(config.DATA_PATHS[data_split]['features_prefix'] + str(q_iid).zfill(12) + '.jpg.npz')['x']
+                    with open(config.DATA_PATHS[data_split]['dc_file'] as f:
+                        json_data=json.load(f)
+                    t_dcvec=json_data[config.DATA_PATHS[data_split][dc_file_prefix]+str(q_iid).zfill(12)]['captions'][1:config.NUM_DC]
                 t_ivec = ( t_ivec / np.sqrt((t_ivec**2).sum()) )
             except:
                 t_ivec = 0.
                 print 'data not found for qid : ', q_iid,  self.mode
-             
+
             # convert answer to vec
             if self.mode == 'val' or self.mode == 'test-dev' or self.mode == 'test':
                 q_ans_str = self.extract_answer(q_ans)
@@ -239,15 +245,22 @@ class VQADataProvider:
                 q_ans_str = self.extract_answer_prob(q_ans)
             t_avec = self.answer_to_vec(q_ans_str)
 
+            for k in range(config.NUM_DC):
+                dc_list=VQADataProviderLayer.seq_to_list(dcvec[k])
+                t_dcvec , t_dc_cvec , t_dc_glove_matrix=self.qlist_to_vec(self.max_length,dc_list)
+                dcvec[i*config.NUM_DC+k,...]=t_dcvec
+                dc_cvec[i*config.NUM_DC+k,...]=t_dc_cvec
+                dc_glove_matrix[i*config.NUM_DC+k,...]=t_dc_glove_matrix
+
             qvec[i,...] = t_qvec
             cvec[i,...] = t_cvec
             ivec[i,...] = t_ivec
             avec[i,...] = t_avec
             glove_matrix[i,...] = t_glove_matrix
 
-        return qvec, cvec, ivec, avec, glove_matrix
+        return qvec,dcvec , cvec,dc_cvec , ivec, avec, glove_matrix, dc_glove_matrix
 
- 
+
     def get_batch_vec(self):
         if self.batch_len is None:
             self.n_skipped = 0
@@ -280,7 +293,7 @@ class VQADataProvider:
                 t_iid_list.append(t_iid)
                 counter += 1
             else:
-                self.n_skipped += 1 
+                self.n_skipped += 1
 
             if self.batch_index < self.batch_len-1:
                 self.batch_index += 1

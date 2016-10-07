@@ -5,7 +5,6 @@ import sys
 import numpy as np
 import json
 import matplotlib.pyplot as plt
-
 import caffe
 from caffe import layers as L
 from caffe import params as P
@@ -18,7 +17,7 @@ import config
 def qlstm(mode, batchsize, T, question_vocab_size):
     n = caffe.NetSpec()
     mode_str = json.dumps({'mode':mode, 'batchsize':batchsize})
-    n.dc_data,n.data, n.cont, n.img_feature, n.label, n.glove = L.Python(\
+    n.data,n.dc_data, n.cont,n.dc_cont , n.img_feature, n.label, n.glove,n.dc_glove = L.Python(\
         module='vqa_data_provider_layer', layer='VQADataProviderLayer', param_str=mode_str, ntop=5 )
 
     n.embed_ba = L.Embed(n.data, input_dim=question_vocab_size, num_output=300, \
@@ -68,12 +67,12 @@ def qlstm(mode, batchsize, T, question_vocab_size):
     n.dc_embed_ba = L.dc_embed(n.dc_data, input_dim=question_vocab_size, num_output=300, \
         weight_filler=dict(type='uniform',min=-0.08,max=0.08))
     n.dc_embed = L.TanH(n.dc_embed_ba)
-    concat_word_dc_embed = [n.dc_embed, n.glove]
-    n.concat_dc_embed = L.Concat(*concat_word_dc_embed, concat_param={'axis': 2}) # T x (20*N) x 600
+    concat_word_dc_embed = [n.dc_embed, n.dc_glove]
+    n.concat_dc_embed = L.Concat(*concat_word_dc_embed, concat_param={'axis': 2}) # T x (config.NUM_DC*N) x 600
 
     # dc_lstm1
     n.dc_lstm1 = L.dc_lstm(\
-                   n.concat_embed, n.cont,\
+                   n.concat_embed, n.dc_cont,\
                    recurrent_param=dict(\
                        num_output=1024,\
                        weight_filler=dict(type='uniform',min=-0.08,max=0.08),\
@@ -90,7 +89,7 @@ def qlstm(mode, batchsize, T, question_vocab_size):
     n.dc_lstm1_droped = L.Dropout(n.dc_lstm1,dropout_param={'dropout_ratio':0.3})
     # dc_lstm2
     n.dc_lstm2 = L.dc_lstm(\
-                   n.dc_lstm1_droped, n.cont,\
+                   n.dc_lstm1_droped, n.dc_cont,\
                    recurrent_param=dict(\
                        num_output=1024,\
                        weight_filler=dict(type='uniform',min=-0.08,max=0.08),\
@@ -111,9 +110,9 @@ def qlstm(mode, batchsize, T, question_vocab_size):
 
 
     n.q_emb_tanh_droped_resh = L.Reshape(n.lstm_12,reshape_param=dict(shape=dict(dim=[-1,2048,1])))
-    n.dc_emb_tanh_droped_resh=L.Reshape(n.dc_lstm_l2,reshape_param=dict(shape=dict( dim=[-1,2048,20])))
+    n.dc_emb_tanh_droped_resh=L.Reshape(n.dc_lstm_l2,reshape_param=dict(shape=dict( dim=[-1,2048,config.NUM_DC])))
 
-    n.q_emb_tanh_droped_resh_tiled_1 = L.Tile(n.q_emb_tanh_droped_resh, axis=2, tiles=176)
+    n.q_emb_tanh_droped_resh_tiled_1 = L.Tile(n.q_emb_tanh_droped_resh, axis=2, tiles=196-config.NUM_DC)
     n.q_emb_tanh_droped_resh_tiled_concat=[n.q_emb_tanh_droped_resh_tiled_1,n.dc_emb_tanh_droped_resh]
     n.q_emb_tanh_droped_resh_tiled_unresh=L.Concat(*n.q_emb_tanh_droped_resh_tiled , concat_param={'axis': 2} )
     n.q_emb_tanh_droped_resh_tiled=L.Reshape( n.q_emb_tanh_droped_resh_tiled_unresh , reshape_param=dict(shape=dict(dim=[-1,2048,14,14])) )
