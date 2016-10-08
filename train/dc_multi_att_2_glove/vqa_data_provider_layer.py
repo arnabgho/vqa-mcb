@@ -78,6 +78,8 @@ class VQADataProvider:
     def load_data(data_split_str):
         all_qdic, all_adic , all_dcdic= {}, {} , {}
         for data_split in data_split_str.split('+'):
+            print("Data Splits")
+            print(data_split)
             assert data_split in config.DATA_PATHS.keys(), 'unknown data split'
             if data_split == 'genome':
                 qdic, adic = VQADataProvider.load_genome_json()
@@ -89,7 +91,7 @@ class VQADataProvider:
                 all_qdic.update(qdic)
                 all_adic.update(adic)
                 all_dcdic.update(dc_dic)
-        return all_qdic, all_adic , dc_dic
+        return all_qdic, all_adic , all_dcdic
 
     def getQuesIds(self):
         return self.qdic.keys()
@@ -107,6 +109,10 @@ class VQADataProvider:
         if self.mode == 'test-dev' or self.mode == 'test':
             return -1
         return self.adic[qid]
+
+    def getDC(self,data_split,q_iid):
+        return self.dcdic[config.DATA_PATHS[data_split]['dc_file_prefix']+str(q_iid).zfill(12) + '.jpg'  ]['captions'][0:config.NUM_DC]
+
 
     @staticmethod
     def seq_to_list(s):
@@ -228,15 +234,15 @@ class VQADataProvider:
             # convert question to vec
             q_list = VQADataProvider.seq_to_list(q_str)
             t_qvec, t_cvec, t_glove_matrix = self.qlist_to_vec(self.max_length, q_list)
-
+            t_dclist=[]
+            qid_split = qid.split(QID_KEY_SEPARATOR)
+            data_split = qid_split[0]
+            t_dclist=self.getDC(data_split,q_iid)
             try:
-                qid_split = qid.split(QID_KEY_SEPARATOR)
-                data_split = qid_split[0]
                 if data_split == 'genome':
                     t_ivec = np.load(config.DATA_PATHS['genome']['features_prefix'] + str(q_iid) + '.jpg.npz')['x']
                 else:
                     t_ivec = np.load(config.DATA_PATHS[data_split]['features_prefix'] + str(q_iid).zfill(12) + '.jpg.npz')['x']
-                    t_dcvec=self.dcdic[config.DATA_PATHS[data_split][dc_file_prefix]+str(q_iid).zfill(12)]['captions'][1:config.NUM_DC]
                 t_ivec = ( t_ivec / np.sqrt((t_ivec**2).sum()) )
             except:
                 t_ivec = 0.
@@ -250,7 +256,7 @@ class VQADataProvider:
             t_avec = self.answer_to_vec(q_ans_str)
 
             for k in range(config.NUM_DC):
-                dc_list=VQADataProvider.seq_to_list(dcvec[k])
+                dc_list=VQADataProvider.seq_to_list(t_dclist[k])
                 t_dcvec , t_dc_cvec , t_dc_glove_matrix=self.qlist_to_vec(self.max_length,dc_list)
                 dcvec[i*config.NUM_DC+k,...]=t_dcvec
                 dc_cvec[i*config.NUM_DC+k,...]=t_dc_cvec
@@ -343,7 +349,7 @@ class VQADataProviderLayer(caffe.Layer):
         if self.mode == 'val' or self.mode == 'test-dev' or self.mode == 'test':
             pass
         else:
-            word,dc_word, cont,dc_cont , feature, answer, glove_matrix,dc_glove_matrix = self.dp.get_batch_vec()
+            word,dc_word, cont,dc_cont , feature, answer, glove_matrix,dc_glove_matrix,_,_,_ = self.dp.get_batch_vec()
             top[0].data[...] = np.transpose(word,(1,0)) # N x T -> T x N
             top[1].data[...] = np.transpose(dc_word,(1,0)) # N x T -> T x N
             top[2].data[...] = np.transpose(cont,(1,0))
