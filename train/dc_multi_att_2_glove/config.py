@@ -15,14 +15,14 @@ QUESTION_VOCAB_SPACE = 'train+val'
 ANSWER_VOCAB_SPACE = 'train+val'
 
 # vqa tools - get from https://github.com/VT-vision-lab/VQA
-VQA_TOOLS_PATH = '~/VQA/PythonHelperTools'
-VQA_EVAL_TOOLS_PATH = '~/VQA/PythonEvaluationTools/'
+VQA_TOOLS_PATH = '/home/arnabg/VQA/PythonHelperTools/'
+VQA_EVAL_TOOLS_PATH = '/home/arnabg/VQA/PythonEvaluationTools/'
 
 # location of the data
-VQA_PREFIX = '~/VQA/'
+VQA_PREFIX = '/home/arnabg/VQA/'
 GENOME_PREFIX = '/y/daylen/vqa/02_tools/genome/'
 DATA_PREFIX = '/home/arnabg/MCB/vqa-mcb/preprocess/vqa_test_res5c/'
-DC_PREFIX='~/densecap/'
+DC_PREFIX='/home/arnabg/densecap/'
 DATA_PATHS = {
 	'train': {
 		'ques_file': VQA_PREFIX + '/Questions/OpenEnded_mscoco_train2014_questions.json',

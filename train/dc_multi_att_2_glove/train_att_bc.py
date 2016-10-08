@@ -18,7 +18,7 @@ def qlstm(mode, batchsize, T, question_vocab_size):
     n = caffe.NetSpec()
     mode_str = json.dumps({'mode':mode, 'batchsize':batchsize})
     n.data,n.dc_data, n.cont,n.dc_cont , n.img_feature, n.label, n.glove,n.dc_glove = L.Python(\
-        module='vqa_data_provider_layer', layer='VQADataProviderLayer', param_str=mode_str, ntop=5 )
+        module='vqa_data_provider_layer', layer='VQADataProviderLayer', param_str=mode_str, ntop=8 )
 
     n.embed_ba = L.Embed(n.data, input_dim=question_vocab_size, num_output=300, \
         weight_filler=dict(type='uniform',min=-0.08,max=0.08))
@@ -72,16 +72,16 @@ def qlstm(mode, batchsize, T, question_vocab_size):
 
     # dc_lstm1
     n.dc_lstm1 = L.dc_lstm(\
-                   n.concat_embed, n.dc_cont,\
+                   n.concat_dc_embed, n.dc_cont,\
                    recurrent_param=dict(\
                        num_output=1024,\
                        weight_filler=dict(type='uniform',min=-0.08,max=0.08),\
                        bias_filler=dict(type='constant',value=0)))
-    tops1 = L.Slice(n.dc_lstm1, ntop=T, slice_param={'axis':0})
+    dc_tops1 = L.Slice(n.dc_lstm1, ntop=T, slice_param={'axis':0})
     for i in xrange(T-1):
-        n.__setattr__('slice_first'+str(i), tops1[int(i)])
-        n.__setattr__('silence_data_first'+str(i), L.Silence(tops1[int(i)],ntop=0))
-    n.dc_lstm1_out = tops1[T-1]
+        n.__setattr__('dc_slice_first'+str(i), dc_tops1[int(i)])
+        n.__setattr__('dc_silence_data_first'+str(i), L.Silence(dc_tops1[int(i)],ntop=0))
+    n.dc_lstm1_out = dc_tops1[T-1]
     n.dc_lstm1_reshaped = L.Reshape(n.dc_lstm1_out,\
                           reshape_param=dict(\
                               shape=dict(dim=[-1,1024])))
@@ -94,27 +94,27 @@ def qlstm(mode, batchsize, T, question_vocab_size):
                        num_output=1024,\
                        weight_filler=dict(type='uniform',min=-0.08,max=0.08),\
                        bias_filler=dict(type='constant',value=0)))
-    tops2 = L.Slice(n.dc_lstm2, ntop=T, slice_param={'axis':0})
+    dc_tops2 = L.Slice(n.dc_lstm2, ntop=T, slice_param={'axis':0})
     for i in xrange(T-1):
-        n.__setattr__('slice_second'+str(i), tops2[int(i)])
-        n.__setattr__('silence_data_second'+str(i), L.Silence(tops2[int(i)],ntop=0))
-    n.dc_lstm2_out = tops2[T-1]
+        n.__setattr__('dc_slice_second'+str(i), dc_tops2[int(i)])
+        n.__setattr__('dc_silence_data_second'+str(i), L.Silence(dc_tops2[int(i)],ntop=0))
+    n.dc_lstm2_out = dc_tops2[T-1]
     n.dc_lstm2_reshaped = L.Reshape(n.dc_lstm2_out,\
                           reshape_param=dict(\
                               shape=dict(dim=[-1,1024])))
     n.dc_lstm2_reshaped_droped = L.Dropout(n.dc_lstm2_reshaped,dropout_param={'dropout_ratio':0.3})
-    concat_botom = [n.dc_lstm1_reshaped_droped, n.dc_lstm2_reshaped_droped]
-    n.dc_lstm_12 = L.Concat(*concat_botom)
+    dc_concat_botom = [n.dc_lstm1_reshaped_droped, n.dc_lstm2_reshaped_droped]
+    n.dc_lstm_12 = L.Concat(*dc_concat_botom)
 
 #######################################################################################################
 
 
     n.q_emb_tanh_droped_resh = L.Reshape(n.lstm_12,reshape_param=dict(shape=dict(dim=[-1,2048,1])))
-    n.dc_emb_tanh_droped_resh=L.Reshape(n.dc_lstm_l2,reshape_param=dict(shape=dict( dim=[-1,2048,config.NUM_DC])))
+    n.dc_emb_tanh_droped_resh=L.Reshape(n.dc_lstm_12,reshape_param=dict(shape=dict( dim=[-1,2048,config.NUM_DC])))
 
     n.q_emb_tanh_droped_resh_tiled_1 = L.Tile(n.q_emb_tanh_droped_resh, axis=2, tiles=196-config.NUM_DC)
     n.q_emb_tanh_droped_resh_tiled_concat=[n.q_emb_tanh_droped_resh_tiled_1,n.dc_emb_tanh_droped_resh]
-    n.q_emb_tanh_droped_resh_tiled_unresh=L.Concat(*n.q_emb_tanh_droped_resh_tiled , concat_param={'axis': 2} )
+    n.q_emb_tanh_droped_resh_tiled_unresh=L.Concat(*n.q_emb_tanh_droped_resh_tiled_concat , concat_param={'axis': 2} )
     n.q_emb_tanh_droped_resh_tiled=L.Reshape( n.q_emb_tanh_droped_resh_tiled_unresh , reshape_param=dict(shape=dict(dim=[-1,2048,14,14])) )
     #n.q_emb_tanh_droped_resh_tiled = L.Tile(n.q_emb_tanh_droped_resh_tiled_1, axis=3, tiles=14)
     n.i_emb_tanh_droped_resh = L.Reshape(n.img_feature,reshape_param=dict(shape=dict(dim=[-1,2048,14,14])))
@@ -217,10 +217,10 @@ def make_vocab_files():
     Produce the question and answer vocabulary files.
     """
     print 'making question vocab...', config.QUESTION_VOCAB_SPACE
-    qdic, _ = VQADataProvider.load_data(config.QUESTION_VOCAB_SPACE)
+    qdic, _ ,_= VQADataProvider.load_data(config.QUESTION_VOCAB_SPACE)
     question_vocab = make_question_vocab(qdic)
     print 'making answer vocab...', config.ANSWER_VOCAB_SPACE
-    _, adic = VQADataProvider.load_data(config.ANSWER_VOCAB_SPACE)
+    _, adic,_ = VQADataProvider.load_data(config.ANSWER_VOCAB_SPACE)
     answer_vocab = make_answer_vocab(adic, config.NUM_OUTPUT_UNITS)
     return question_vocab, answer_vocab
 

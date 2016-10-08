@@ -17,7 +17,7 @@ class VQADataProvider:
         self.rev_adict = None
         self.max_length = max_length
         self.mode = mode
-        self.qdic, self.adic = VQADataProvider.load_data(mode)
+        self.qdic, self.adic , self.dcdic= VQADataProvider.load_data(mode)
 
         with open('./result/vdict.json','r') as f:
             self.vdict = json.load(f)
@@ -51,7 +51,11 @@ class VQADataProvider:
 
         print 'parsed', len(qdic), 'questions for', data_split
         return qdic, adic
-
+    @staticmethod
+    def load_dc_json(data_split):
+        with open(config.DATA_PATHS[data_split]['dc_file']) as f:
+            json_data=json.load(f)
+        return json_data
     @staticmethod
     def load_genome_json():
         """
@@ -72,7 +76,7 @@ class VQADataProvider:
 
     @staticmethod
     def load_data(data_split_str):
-        all_qdic, all_adic = {}, {}
+        all_qdic, all_adic , all_dcdic= {}, {} , {}
         for data_split in data_split_str.split('+'):
             assert data_split in config.DATA_PATHS.keys(), 'unknown data split'
             if data_split == 'genome':
@@ -81,9 +85,11 @@ class VQADataProvider:
                 all_adic.update(adic)
             else:
                 qdic, adic = VQADataProvider.load_vqa_json(data_split)
+                dc_dic=VQADataProvider.load_dc_json(data_split)
                 all_qdic.update(qdic)
                 all_adic.update(adic)
-        return all_qdic, all_adic
+                all_dcdic.update(dc_dic)
+        return all_qdic, all_adic , dc_dic
 
     def getQuesIds(self):
         return self.qdic.keys()
@@ -230,9 +236,7 @@ class VQADataProvider:
                     t_ivec = np.load(config.DATA_PATHS['genome']['features_prefix'] + str(q_iid) + '.jpg.npz')['x']
                 else:
                     t_ivec = np.load(config.DATA_PATHS[data_split]['features_prefix'] + str(q_iid).zfill(12) + '.jpg.npz')['x']
-                    with open(config.DATA_PATHS[data_split]['dc_file'] as f:
-                        json_data=json.load(f)
-                    t_dcvec=json_data[config.DATA_PATHS[data_split][dc_file_prefix]+str(q_iid).zfill(12)]['captions'][1:config.NUM_DC]
+                    t_dcvec=self.dcdic[config.DATA_PATHS[data_split][dc_file_prefix]+str(q_iid).zfill(12)]['captions'][1:config.NUM_DC]
                 t_ivec = ( t_ivec / np.sqrt((t_ivec**2).sum()) )
             except:
                 t_ivec = 0.

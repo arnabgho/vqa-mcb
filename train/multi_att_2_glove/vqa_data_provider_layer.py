@@ -25,13 +25,13 @@ class VQADataProvider:
             self.adict = json.load(f)
 
         self.n_ans_vocabulary = len(self.adict)
-        self.nlp = spacy.load('en', vectors='en_glove_cc_300_1m_vectors')
+        #self.nlp = spacy.load('en', vectors='en_glove_cc_300_1m_vectors')
         self.glove_dict = {} # word -> glove vector
-
+        self.nlp = spacy.load('en')
     @staticmethod
     def load_vqa_json(data_split):
         """
-        Parses the question and answer json files for the given data split. 
+        Parses the question and answer json files for the given data split.
         Returns the question dictionary and the answer dictionary.
         """
         qdic, adic = {}, {}
@@ -145,7 +145,7 @@ class VQADataProvider:
                 raise Exception("This should not happen.")
         else:
             return random.choice(prob_answer_list)
- 
+
     def qlist_to_vec(self, max_length, q_list):
         """
         Converts a list of words into a format suitable for the embedding layer.
@@ -178,7 +178,7 @@ class VQADataProvider:
                 cvec[i] = 0 if i == max_length - len(q_list) else 1
 
         return qvec, cvec, glove_matrix
- 
+
     def answer_to_vec(self, ans_str):
         """ Return answer id if the answer is included in vocabulary otherwise '' """
         if self.mode =='test-dev' or self.mode == 'test':
@@ -189,7 +189,7 @@ class VQADataProvider:
         else:
             ans = self.adict['']
         return ans
- 
+
     def vec_to_answer(self, ans_symbol):
         """ Return answer id if the answer is included in vocabulary otherwise '' """
         if self.rev_adict is None:
@@ -199,7 +199,7 @@ class VQADataProvider:
             self.rev_adict = rev_adict
 
         return self.rev_adict[ans_symbol]
- 
+
     def create_batch(self,qid_list):
 
         qvec = (np.zeros(self.batchsize*self.max_length)).reshape(self.batchsize,self.max_length)
@@ -231,7 +231,7 @@ class VQADataProvider:
             except:
                 t_ivec = 0.
                 print 'data not found for qid : ', q_iid,  self.mode
-             
+
             # convert answer to vec
             if self.mode == 'val' or self.mode == 'test-dev' or self.mode == 'test':
                 q_ans_str = self.extract_answer(q_ans)
@@ -247,7 +247,7 @@ class VQADataProvider:
 
         return qvec, cvec, ivec, avec, glove_matrix
 
- 
+
     def get_batch_vec(self):
         if self.batch_len is None:
             self.n_skipped = 0
@@ -280,7 +280,7 @@ class VQADataProvider:
                 t_iid_list.append(t_iid)
                 counter += 1
             else:
-                self.n_skipped += 1 
+                self.n_skipped += 1
 
             if self.batch_index < self.batch_len-1:
                 self.batch_index += 1
