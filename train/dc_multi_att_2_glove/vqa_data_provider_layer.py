@@ -9,7 +9,7 @@ GLOVE_EMBEDDING_SIZE = 300
 
 class VQADataProvider:
 
-    def __init__(self, batchsize=64, max_length=15, mode='train'):
+    def __init__(self, batchsize=config.BATCH_SIZE, max_length=15, mode='train'):
         self.batchsize = batchsize
         self.d_vocabulary = None
         self.batch_index = None
@@ -25,7 +25,7 @@ class VQADataProvider:
             self.adict = json.load(f)
 
         self.n_ans_vocabulary = len(self.adict)
-        self.nlp = spacy.load('en', vectors='en_glove_cc_300_1m_vectors')
+        self.nlp = spacy.load('en')
         self.glove_dict = {} # word -> glove vector
 
     @staticmethod
@@ -250,7 +250,7 @@ class VQADataProvider:
             t_avec = self.answer_to_vec(q_ans_str)
 
             for k in range(config.NUM_DC):
-                dc_list=VQADataProviderLayer.seq_to_list(dcvec[k])
+                dc_list=VQADataProvider.seq_to_list(dcvec[k])
                 t_dcvec , t_dc_cvec , t_dc_glove_matrix=self.qlist_to_vec(self.max_length,dc_list)
                 dcvec[i*config.NUM_DC+k,...]=t_dcvec
                 dc_cvec[i*config.NUM_DC+k,...]=t_dc_cvec
@@ -321,13 +321,15 @@ class VQADataProviderLayer(caffe.Layer):
 
     def setup(self, bottom, top):
         self.batchsize = json.loads(self.param_str)['batchsize']
-        self.top_names = ['data','cont','feature','label','glove']
+        self.top_names = ['data','dc_data','cont','dc_cont','feature','label','glove','dc_glove']
         top[0].reshape(15,self.batchsize)
-        top[1].reshape(15,self.batchsize)
-        top[2].reshape(self.batchsize,2048,14,14)
-        top[3].reshape(self.batchsize)
-        top[4].reshape(15,self.batchsize,GLOVE_EMBEDDING_SIZE)
-
+        top[1].reshape(15,self.batchsize*config.NUM_DC)
+        top[2].reshape(15,self.batchsize)
+        top[3].reshape(15,self.batchsize*config.NUM_DC)
+        top[4].reshape(self.batchsize,2048,14,14)
+        top[5].reshape(self.batchsize)
+        top[6].reshape(15,self.batchsize,GLOVE_EMBEDDING_SIZE)
+        top[7].reshape(15,self.batchsize*config.NUM_DC,GLOVE_EMBEDDING_SIZE)
         self.mode = json.loads(self.param_str)['mode']
         if self.mode == 'val' or self.mode == 'test-dev' or self.mode == 'test':
             pass
@@ -341,13 +343,16 @@ class VQADataProviderLayer(caffe.Layer):
         if self.mode == 'val' or self.mode == 'test-dev' or self.mode == 'test':
             pass
         else:
-            word, cont, feature, answer, glove_matrix, _, _, _ = self.dp.get_batch_vec()
+            word,dc_word, cont,dc_cont , feature, answer, glove_matrix,dc_glove_matrix = self.dp.get_batch_vec()
             top[0].data[...] = np.transpose(word,(1,0)) # N x T -> T x N
-            top[1].data[...] = np.transpose(cont,(1,0))
-            top[2].data[...] = feature
-            top[3].data[...] = answer
-            top[4].data[...] = np.transpose(glove_matrix, (1,0,2)) # N x T x 300 -> T x N x 300
+            top[1].data[...] = np.transpose(dc_word,(1,0)) # N x T -> T x N
+            top[2].data[...] = np.transpose(cont,(1,0))
+            top[3].data[...] = np.transpose(dc_cont,(1,0))
+            top[4].data[...] = feature
+            top[5].data[...] = answer
+            top[6].data[...] = np.transpose(glove_matrix, (1,0,2)) # N x T x 300 -> T x N x 300
 
+            top[7].data[...] = np.transpose(dc_glove_matrix, (1,0,2)) # N x T x 300 -> T x N x 300
     def backward(self, top, propagate_down, bottom):
         pass
 

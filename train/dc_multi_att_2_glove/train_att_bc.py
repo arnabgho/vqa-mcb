@@ -64,14 +64,14 @@ def qlstm(mode, batchsize, T, question_vocab_size):
 
 ################################ Dense Caption Introduction ##############################3
 
-    n.dc_embed_ba = L.dc_embed(n.dc_data, input_dim=question_vocab_size, num_output=300, \
+    n.dc_embed_ba = L.Embed(n.dc_data, input_dim=question_vocab_size, num_output=300, \
         weight_filler=dict(type='uniform',min=-0.08,max=0.08))
     n.dc_embed = L.TanH(n.dc_embed_ba)
     concat_word_dc_embed = [n.dc_embed, n.dc_glove]
     n.concat_dc_embed = L.Concat(*concat_word_dc_embed, concat_param={'axis': 2}) # T x (config.NUM_DC*N) x 600
 
     # dc_lstm1
-    n.dc_lstm1 = L.dc_lstm(\
+    n.dc_lstm1 = L.LSTM(\
                    n.concat_dc_embed, n.dc_cont,\
                    recurrent_param=dict(\
                        num_output=1024,\
@@ -79,8 +79,8 @@ def qlstm(mode, batchsize, T, question_vocab_size):
                        bias_filler=dict(type='constant',value=0)))
     dc_tops1 = L.Slice(n.dc_lstm1, ntop=T, slice_param={'axis':0})
     for i in xrange(T-1):
-        n.__setattr__('dc_slice_first'+str(i), dc_tops1[int(i)])
-        n.__setattr__('dc_silence_data_first'+str(i), L.Silence(dc_tops1[int(i)],ntop=0))
+        n.__setattr__('dc_slice_first'+str(i),dc_tops1[int(i)])
+        n.__setattr__('dc_silence_data_first_dc'+str(i), L.Silence(dc_tops1[int(i)],ntop=0))
     n.dc_lstm1_out = dc_tops1[T-1]
     n.dc_lstm1_reshaped = L.Reshape(n.dc_lstm1_out,\
                           reshape_param=dict(\
@@ -88,7 +88,7 @@ def qlstm(mode, batchsize, T, question_vocab_size):
     n.dc_lstm1_reshaped_droped = L.Dropout(n.dc_lstm1_reshaped,dropout_param={'dropout_ratio':0.3})
     n.dc_lstm1_droped = L.Dropout(n.dc_lstm1,dropout_param={'dropout_ratio':0.3})
     # dc_lstm2
-    n.dc_lstm2 = L.dc_lstm(\
+    n.dc_lstm2 = L.LSTM(\
                    n.dc_lstm1_droped, n.dc_cont,\
                    recurrent_param=dict(\
                        num_output=1024,\
@@ -97,7 +97,7 @@ def qlstm(mode, batchsize, T, question_vocab_size):
     dc_tops2 = L.Slice(n.dc_lstm2, ntop=T, slice_param={'axis':0})
     for i in xrange(T-1):
         n.__setattr__('dc_slice_second'+str(i), dc_tops2[int(i)])
-        n.__setattr__('dc_silence_data_second'+str(i), L.Silence(dc_tops2[int(i)],ntop=0))
+        n.__setattr__('dc_silence_data_second_dc'+str(i), L.Silence(dc_tops2[int(i)],ntop=0))
     n.dc_lstm2_out = dc_tops2[T-1]
     n.dc_lstm2_reshaped = L.Reshape(n.dc_lstm2_out,\
                           reshape_param=dict(\
@@ -113,8 +113,8 @@ def qlstm(mode, batchsize, T, question_vocab_size):
     n.dc_emb_tanh_droped_resh=L.Reshape(n.dc_lstm_12,reshape_param=dict(shape=dict( dim=[-1,2048,config.NUM_DC])))
 
     n.q_emb_tanh_droped_resh_tiled_1 = L.Tile(n.q_emb_tanh_droped_resh, axis=2, tiles=196-config.NUM_DC)
-    n.q_emb_tanh_droped_resh_tiled_concat=[n.q_emb_tanh_droped_resh_tiled_1,n.dc_emb_tanh_droped_resh]
-    n.q_emb_tanh_droped_resh_tiled_unresh=L.Concat(*n.q_emb_tanh_droped_resh_tiled_concat , concat_param={'axis': 2} )
+    q_emb_tanh_droped_resh_tiled_concat=[n.q_emb_tanh_droped_resh_tiled_1,n.dc_emb_tanh_droped_resh]
+    n.q_emb_tanh_droped_resh_tiled_unresh=L.Concat(*q_emb_tanh_droped_resh_tiled_concat , concat_param={'axis': 2} )
     n.q_emb_tanh_droped_resh_tiled=L.Reshape( n.q_emb_tanh_droped_resh_tiled_unresh , reshape_param=dict(shape=dict(dim=[-1,2048,14,14])) )
     #n.q_emb_tanh_droped_resh_tiled = L.Tile(n.q_emb_tanh_droped_resh_tiled_1, axis=3, tiles=14)
     n.i_emb_tanh_droped_resh = L.Reshape(n.img_feature,reshape_param=dict(shape=dict(dim=[-1,2048,14,14])))
