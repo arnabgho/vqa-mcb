@@ -256,11 +256,14 @@ def main():
     caffe.set_device(config.GPU_ID)
     caffe.set_mode_gpu()
     solver = caffe.get_solver('./qlstm_solver.prototxt')
-
+    start=0
+    if(config.LOAD_SOLVER_STATE):
+        solver.restore(config.SOLVER_STATE_LOAD)
+        start=int(config.SOLVER_STATE_LOAD.split('.')[1].split('_')[-1])+1
     train_loss = np.zeros(config.MAX_ITERATIONS)
     results = []
 
-    for it in range(config.MAX_ITERATIONS):
+    for it in xrange(start,config.MAX_ITERATIONS):
         solver.step(1)
 
         # store the train loss

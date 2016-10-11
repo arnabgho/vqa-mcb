@@ -7,6 +7,8 @@ MAX_ITERATIONS = 1000000
 PRINT_INTERVAL = 100
 VALIDATE_INTERVAL = 10000
 NUM_DC=20
+SOLVER_STATE_LOAD='./result/_iter_90000.solverstate'
+LOAD_SOLVER_STATE=True
 # what data to use for training
 TRAIN_DATA_SPLITS = 'train+val'
 
