@@ -25,9 +25,8 @@ class VQADataProvider:
             self.adict = json.load(f)
 
         self.n_ans_vocabulary = len(self.adict)
-        #self.nlp = spacy.load('en', vectors='en_glove_cc_300_1m_vectors')
+        self.nlp = spacy.load('en', vectors='en_glove_cc_300_1m_vectors')
         self.glove_dict = {} # word -> glove vector
-        self.nlp = spacy.load('en')
     @staticmethod
     def load_vqa_json(data_split):
         """

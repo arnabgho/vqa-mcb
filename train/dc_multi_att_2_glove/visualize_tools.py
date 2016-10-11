@@ -59,7 +59,7 @@ def visualize_failures(stat_list,mode):
                         saveflag = True
                     else:
                         saveflag = False
-                               
+
                     if saveflag == True:
                         t_iid = t_question['iid']
                         if mode == 'val':
@@ -115,6 +115,96 @@ def visualize_failures(stat_list,mode):
     qt_howmany_list =[['how','many']]
     save_qtype(qt_howmany_list, 'howmany', mode)
 
+def custom_exec_validation(device_id, mode, it='', modelfile='./result/tmp.caffemodel',visualize=False):
+
+    caffe.set_device(device_id)
+    caffe.set_mode_gpu()
+    net = caffe.Net('./result/proto_test.prototxt',\
+              modelfile,\
+              caffe.TEST)
+
+    dp = VQADataProvider(mode=mode,batchsize=config.VAL_BATCH_SIZE)
+    total_questions = len(dp.getQuesIds())
+    epoch = 0
+
+    pred_list = []
+    testloss_list = []
+    stat_list = []
+
+    while epoch == 0:
+        t_word,t_dc_word, t_cont,t_dc_cont, t_img_feature, t_answer, t_glove_matrix,t_dc_glove_matrix, t_qid_list, t_iid_list, epoch = dp.get_batch_vec()
+        net.blobs['data'].data[...] = np.transpose(t_word,(1,0))
+        net.blobs['dc_data'].data[...]=np.transpose(t_dc_word,(1,0))
+        net.blobs['cont'].data[...] = np.transpose(t_cont,(1,0))
+        net.blobs['dc_cont'].data[...] = np.transpose(t_dc_cont,(1,0))
+        net.blobs['img_feature'].data[...] = t_img_feature
+        net.blobs['label'].data[...] = t_answer
+        net.blobs['glove'].data[...] = np.transpose(t_glove_matrix, (1,0,2))
+        net.blobs['dc_glove'].data[...] = np.transpose(t_dc_glove_matrix, (1,0,2))
+
+        net.forward()
+        t_pred_list = net.blobs['prediction'].data.argmax(axis=1)
+        t_pred_str = [dp.vec_to_answer(pred_symbol) for pred_symbol in t_pred_list]
+        testloss_list.append(net.blobs['loss'].data)
+        for qid, iid, ans, pred in zip(t_qid_list, t_iid_list, t_answer.tolist(), t_pred_str):
+            pred_list.append({u'answer':pred, u'question_id': int(dp.getStrippedQuesId(qid))})
+            if visualize:
+                q_list = dp.seq_to_list(dp.getQuesStr(qid))
+                if mode == 'test-dev' or 'test':
+                    ans_str = ''
+                    ans_list = ['']*10
+                else:
+                    ans_str = dp.vec_to_answer(ans)
+                    ans_list = [ dp.getAnsObj(qid)[i]['answer'] for i in xrange(10)]
+                stat_list.append({\
+                                    'qid'   : qid,
+                                    'q_list' : q_list,
+                                    'iid'   : iid,
+                                    'answer': ans_str,
+                                    'ans_list': ans_list,
+                                    'pred'  : pred })
+        percent = 100 * float(len(pred_list)) / total_questions
+        sys.stdout.write('\r' + ('%.2f' % percent) + '%')
+        sys.stdout.flush()
+
+
+
+    mean_testloss = np.array(testloss_list).mean()
+
+    if mode == 'val':
+        valFile = './result/val2015_resfile'
+        with open(valFile, 'w') as f:
+            json.dump(pred_list, f)
+        if visualize:
+            visualize_failures(stat_list,mode)
+        annFile = config.DATA_PATHS['val']['ans_file']
+        quesFile = config.DATA_PATHS['val']['ques_file']
+        vqa = VQA(annFile, quesFile)
+        vqaRes = vqa.loadRes(valFile, quesFile)
+        vqaEval = VQAEval(vqa, vqaRes, n=2)
+        vqaEval.evaluate()
+        acc_overall = vqaEval.accuracy['overall']
+        acc_perQuestionType = vqaEval.accuracy['perQuestionType']
+        acc_perAnswerType = vqaEval.accuracy['perAnswerType']
+        return mean_testloss, acc_overall, acc_perQuestionType, acc_perAnswerType
+    elif mode == 'test-dev':
+        filename = './result/vqa_OpenEnded_mscoco_test-dev2015_v3t'+str(it).zfill(8)+'_results'
+        with open(filename+'.json', 'w') as f:
+            json.dump(pred_list, f)
+        if visualize:
+            visualize_failures(stat_list,mode)
+    elif mode == 'test':
+        filename = './result/vqa_OpenEnded_mscoco_test2015_v3c'+str(it).zfill(8)+'_results'
+        with open(filename+'.json', 'w') as f:
+            json.dump(pred_list, f)
+        if visualize:
+            visualize_failures(stat_list,mode)
+
+
+
+
+
+
 def exec_validation(device_id, mode, it='', visualize=False):
 
     caffe.set_device(device_id)
@@ -132,12 +222,16 @@ def exec_validation(device_id, mode, it='', visualize=False):
     stat_list = []
 
     while epoch == 0:
-        t_word, t_cont, t_img_feature, t_answer, t_glove_matrix, t_qid_list, t_iid_list, epoch = dp.get_batch_vec()
+        t_word,t_dc_word, t_cont,t_dc_cont, t_img_feature, t_answer, t_glove_matrix,t_dc_glove_matrix, t_qid_list, t_iid_list, epoch = dp.get_batch_vec()
         net.blobs['data'].data[...] = np.transpose(t_word,(1,0))
+        net.blobs['dc_data'].data[...]=np.transpose(t_dc_word,(1,0))
         net.blobs['cont'].data[...] = np.transpose(t_cont,(1,0))
+        net.blobs['dc_cont'].data[...] = np.transpose(t_dc_cont,(1,0))
         net.blobs['img_feature'].data[...] = t_img_feature
         net.blobs['label'].data[...] = t_answer
         net.blobs['glove'].data[...] = np.transpose(t_glove_matrix, (1,0,2))
+        net.blobs['dc_glove'].data[...] = np.transpose(t_dc_glove_matrix, (1,0,2))
+
         net.forward()
         t_pred_list = net.blobs['prediction'].data.argmax(axis=1)
         t_pred_str = [dp.vec_to_answer(pred_symbol) for pred_symbol in t_pred_list]

@@ -25,7 +25,7 @@ class VQADataProvider:
             self.adict = json.load(f)
 
         self.n_ans_vocabulary = len(self.adict)
-        self.nlp = spacy.load('en')
+        self.nlp = spacy.load('en', vectors='en_glove_cc_300_1m_vectors')
         self.glove_dict = {} # word -> glove vector
 
     @staticmethod
@@ -243,7 +243,10 @@ class VQADataProvider:
                     t_ivec = np.load(config.DATA_PATHS['genome']['features_prefix'] + str(q_iid) + '.jpg.npz')['x']
                 else:
                     t_ivec = np.load(config.DATA_PATHS[data_split]['features_prefix'] + str(q_iid).zfill(12) + '.jpg.npz')['x']
-                t_ivec = ( t_ivec / np.sqrt((t_ivec**2).sum()) )
+                if np.sqrt((t_ivec**2).sum()) > 1e-5 :
+                    t_ivec = ( t_ivec / np.sqrt((t_ivec**2).sum()) )
+                else:
+                    t_ivec=0.
             except:
                 t_ivec = 0.
                 print 'data not found for qid : ', q_iid,  self.mode
