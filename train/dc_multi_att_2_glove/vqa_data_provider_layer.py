@@ -249,7 +249,7 @@ class VQADataProvider:
                     t_ivec=0.
             except:
                 t_ivec = 0.
-                print 'data not found for qid : ', q_iid,  self.mode
+                print 'data not found for qiid : ', q_iid,  self.mode
 
             # convert answer to vec
             if self.mode == 'val' or self.mode == 'test-dev' or self.mode == 'test':

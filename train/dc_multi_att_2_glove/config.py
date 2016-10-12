@@ -5,9 +5,9 @@ NUM_OUTPUT_UNITS = 3000 # This is the answer vocabulary size
 MAX_WORDS_IN_QUESTION = 15
 MAX_ITERATIONS = 1000000
 PRINT_INTERVAL = 100
-VALIDATE_INTERVAL = 10000
+VALIDATE_INTERVAL = 1000000000
 NUM_DC=20
-SOLVER_STATE_LOAD='./result/_iter_90000.solverstate'
+SOLVER_STATE_LOAD='./result/_iter_120000.solverstate'
 LOAD_SOLVER_STATE=True
 # what data to use for training
 TRAIN_DATA_SPLITS = 'train+val'
@@ -43,13 +43,13 @@ DATA_PATHS = {
 	},
 	'test-dev': {
 		'ques_file': VQA_PREFIX + '/Questions/OpenEnded_mscoco_test-dev2015_questions.json',
-		'features_prefix': VQA_PREFIX + '/resnet_res5c_bgrms_large/test2015/COCO_test2015_',
+		'features_prefix': DATA_PREFIX + '/resnet_res5c_bgrms_large/test2015/COCO_test2015_',
         'dc_file':DC_PREFIX+'/vt-captions-test/test_results_indexed.json',
         'dc_file_prefix':'COCO_test2015_'
 	},
 	'test': {
 		'ques_file': VQA_PREFIX + '/Questions/OpenEnded_mscoco_test2015_questions.json',
-		'features_prefix': VQA_PREFIX + '/resnet_res5c_bgrms_large/test2015/COCO_test2015_',
+		'features_prefix': DATA_PREFIX + '/resnet_res5c_bgrms_large/test2015/COCO_test2015_',
         'dc_file':DC_PREFIX+'/vt-captions-test/test_results_indexed.json',
         'dc_file_prefix':'COCO_test2015_'
 	},
