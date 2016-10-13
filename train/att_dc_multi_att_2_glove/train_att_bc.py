@@ -112,8 +112,31 @@ def qlstm(mode, batchsize, T, question_vocab_size):
     n.q_emb_tanh_droped_resh = L.Reshape(n.lstm_12,reshape_param=dict(shape=dict(dim=[-1,2048,1])))
     n.dc_emb_tanh_droped_resh=L.Reshape(n.dc_lstm_12,reshape_param=dict(shape=dict( dim=[-1,2048,config.NUM_DC])))
 
-    n.q_emb_tanh_droped_resh_tiled_1 = L.Tile(n.q_emb_tanh_droped_resh, axis=2, tiles=196-config.NUM_DC)
-    q_emb_tanh_droped_resh_tiled_concat=[n.q_emb_tanh_droped_resh_tiled_1,n.dc_emb_tanh_droped_resh]
+
+############################ ATTENTION OVER DENSE CAPTIONS BASED ON QUESTION ##########################
+
+    n.q_emb_att_resh_tiled = L.Tile(n.q_emb_tanh_droped_resh,axis=2,tiles=config.NUM_DC)
+
+    n.bc_att_dc=L.CompactBilinear(n.q_emb_att_resh_tiled , n.dc_emb_tanh_droped_resh, compact_bilinear_param=dict(num_output=16000,sum_pool=False) )
+    n,bc_att_dc_sign_sqrt=L.SignedSqrt(n.bc_att_dc)
+    n.bc_att_dc_sign_sqrt_l2=L.L2Normalize(n.bc_att_dc_sign_sqrt)
+    n.bc_att_dc_droped=L.Dropout(n.bc_att_dc_sign_sqrt,dropout_param={'dropout_ratio':0.1})
+
+    n.bc_att_dc_resh=L.Reshape(n.bc_att_dc_droped,reshape_param=dict(shape=dict( dim=[-1,16000,config.NUM_DC,1])))
+    n.dc_att_conv1 = L.Convolution(n.bc_att_dc_resh, kernel_size=1, stride=1, num_output=512, pad=0, weight_filler=dict(type='xavier'))
+    n.dc_att_conv1_relu=L.ReLU(n.dc_att_conv1)
+    n.dc_att_conv2=L.Convolution(n.dc_att_conv1_relu, kernel_size=1, stride=1, num_output=1, pad=0, weight_filler=dict(type='xavier'))
+    n.dc_att_reshaped=L.Reshape(n.dc_att_conv2,reshape_param=dict(shape=dict(dim=[-1,1,config.NUM_DC])))
+    n.dc_att_softmax=L.Softmax(n.dc_att_reshaped,axis=2)
+    dummy = L.DummyData(shape=dict(dim=[batchsize, 1]), data_filler=dict(type='constant', value=1), ntop=1)
+    n.dc_emb_tanh_droped_resh_resh=L.Reshape(n.dc_lstm_12,reshape_param=dict(shape=dict( dim=[-1,2048,config.NUM_DC,1])))
+    n.dc_att_feature=L.SoftAttention(n.dc_emb_tanh_droped_resh_resh,n.dc_att_softmax,dummy)
+    n.dc_att_feature_resh=L.Reshape(n.dc_att_feature,reshape_param=dict(shape=dict( dim=[-1,2048,1])))
+#######################################################################################################
+
+    n.dc_att_feature_resh_tiled=L.Tile(n.dc_att_feature_resh,axis=2,tiles=98)
+    n.q_emb_tanh_droped_resh_tiled_1 = L.Tile(n.q_emb_tanh_droped_resh, axis=2, tiles=98)
+    q_emb_tanh_droped_resh_tiled_concat=[n.q_emb_tanh_droped_resh_tiled_1,n.dc_att_feature_resh_tiled]
     n.q_emb_tanh_droped_resh_tiled_unresh=L.Concat(*q_emb_tanh_droped_resh_tiled_concat , concat_param={'axis': 2} )
     n.q_emb_tanh_droped_resh_tiled=L.Reshape( n.q_emb_tanh_droped_resh_tiled_unresh , reshape_param=dict(shape=dict(dim=[-1,2048,14,14])) )
     #n.q_emb_tanh_droped_resh_tiled = L.Tile(n.q_emb_tanh_droped_resh_tiled_1, axis=3, tiles=14)
@@ -133,7 +156,7 @@ def qlstm(mode, batchsize, T, question_vocab_size):
     att_maps = L.Slice(n.att, ntop=2, slice_param={'axis':1})
     n.att_map0 = att_maps[0]
     n.att_map1 = att_maps[1]
-    dummy = L.DummyData(shape=dict(dim=[batchsize, 1]), data_filler=dict(type='constant', value=1), ntop=1)
+    #dummy = L.DummyData(shape=dict(dim=[batchsize, 1]), data_filler=dict(type='constant', value=1), ntop=1)
     n.att_feature0  = L.SoftAttention(n.i_emb_tanh_droped_resh, n.att_map0, dummy)
     n.att_feature1  = L.SoftAttention(n.i_emb_tanh_droped_resh, n.att_map1, dummy)
     n.att_feature0_resh = L.Reshape(n.att_feature0, reshape_param=dict(shape=dict(dim=[-1,2048])))
