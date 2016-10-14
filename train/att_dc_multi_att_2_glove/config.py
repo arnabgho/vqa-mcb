@@ -8,7 +8,7 @@ PRINT_INTERVAL = 100
 VALIDATE_INTERVAL = 1000000000
 NUM_DC=20
 SOLVER_STATE_LOAD='./result/_iter_120000.solverstate'
-LOAD_SOLVER_STATE=True
+LOAD_SOLVER_STATE=False
 # what data to use for training
 TRAIN_DATA_SPLITS = 'train+val'
 

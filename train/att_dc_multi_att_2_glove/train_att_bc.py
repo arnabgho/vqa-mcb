@@ -116,21 +116,22 @@ def qlstm(mode, batchsize, T, question_vocab_size):
 ############################ ATTENTION OVER DENSE CAPTIONS BASED ON QUESTION ##########################
 
     n.q_emb_att_resh_tiled = L.Tile(n.q_emb_tanh_droped_resh,axis=2,tiles=config.NUM_DC)
-
-    n.bc_att_dc=L.CompactBilinear(n.q_emb_att_resh_tiled , n.dc_emb_tanh_droped_resh, compact_bilinear_param=dict(num_output=16000,sum_pool=False) )
-    n,bc_att_dc_sign_sqrt=L.SignedSqrt(n.bc_att_dc)
+    n.dc_emb_tanh_droped_resh_resh=L.Reshape(n.dc_emb_tanh_droped_resh,reshape_param=dict(shape=dict( dim=[-1,2048,config.NUM_DC,1])))
+    n.q_emb_att_resh_tiled_resh=L.Reshape(n.q_emb_att_resh_tiled,reshape_param=dict(shape=dict( dim=[-1,2048,config.NUM_DC,1])))
+    n.bc_att_dc=L.CompactBilinear(n.q_emb_att_resh_tiled_resh , n.dc_emb_tanh_droped_resh_resh, compact_bilinear_param=dict(num_output=16000,sum_pool=False) )
+    n.bc_att_dc_sign_sqrt=L.SignedSqrt(n.bc_att_dc)
     n.bc_att_dc_sign_sqrt_l2=L.L2Normalize(n.bc_att_dc_sign_sqrt)
-    n.bc_att_dc_droped=L.Dropout(n.bc_att_dc_sign_sqrt,dropout_param={'dropout_ratio':0.1})
+    n.bc_att_dc_droped=L.Dropout(n.bc_att_dc_sign_sqrt_l2,dropout_param={'dropout_ratio':0.1})
 
-    n.bc_att_dc_resh=L.Reshape(n.bc_att_dc_droped,reshape_param=dict(shape=dict( dim=[-1,16000,config.NUM_DC,1])))
-    n.dc_att_conv1 = L.Convolution(n.bc_att_dc_resh, kernel_size=1, stride=1, num_output=512, pad=0, weight_filler=dict(type='xavier'))
+    #n.bc_att_dc_resh=L.Reshape(n.bc_att_dc_droped,reshape_param=dict(shape=dict( dim=[-1,16000,config.NUM_DC,1])))
+    n.dc_att_conv1 = L.Convolution(n.bc_att_dc_droped, kernel_size=1, stride=1, num_output=512, pad=0, weight_filler=dict(type='xavier'))
     n.dc_att_conv1_relu=L.ReLU(n.dc_att_conv1)
     n.dc_att_conv2=L.Convolution(n.dc_att_conv1_relu, kernel_size=1, stride=1, num_output=1, pad=0, weight_filler=dict(type='xavier'))
     n.dc_att_reshaped=L.Reshape(n.dc_att_conv2,reshape_param=dict(shape=dict(dim=[-1,1,config.NUM_DC])))
     n.dc_att_softmax=L.Softmax(n.dc_att_reshaped,axis=2)
+    n.dc_att_softmax_resh=L.Reshape(n.dc_att_softmax,reshape_param=dict( shape=dict( dim=[-1,1,config.NUM_DC,1]  )  ))
     dummy = L.DummyData(shape=dict(dim=[batchsize, 1]), data_filler=dict(type='constant', value=1), ntop=1)
-    n.dc_emb_tanh_droped_resh_resh=L.Reshape(n.dc_lstm_12,reshape_param=dict(shape=dict( dim=[-1,2048,config.NUM_DC,1])))
-    n.dc_att_feature=L.SoftAttention(n.dc_emb_tanh_droped_resh_resh,n.dc_att_softmax,dummy)
+    n.dc_att_feature=L.SoftAttention(n.dc_emb_tanh_droped_resh_resh,n.dc_att_softmax_resh,dummy)
     n.dc_att_feature_resh=L.Reshape(n.dc_att_feature,reshape_param=dict(shape=dict( dim=[-1,2048,1])))
 #######################################################################################################
 

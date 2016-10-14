@@ -12,7 +12,7 @@ layer {
   python_param {
     module: "vqa_data_provider_layer"
     layer: "VQADataProviderLayer"
-    param_str: "{\"batchsize\": 16, \"mode\": \"val\"}"
+    param_str: "{\"batchsize\": 8, \"mode\": \"val\"}"
   }
 }
 layer {
@@ -839,7 +839,7 @@ layer {
       value: 1
     }
     shape {
-      dim: 16
+      dim: 8
       dim: 1
     }
   }
